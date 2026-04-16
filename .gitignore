@@ -1,0 +1,23 @@
+# Built binary
+photo-ai.exe
+
+# Embedded engine binaries (copied during make all, not committed)
+internal/engines/*.exe
+
+# Web assets copied from ../web/ (keep assets.go, ignore copied files)
+internal/web/*.html
+internal/web/*.json
+internal/web/deckpilot/
+internal/web/ghostty-web/
+internal/web/pages/
+
+# Master CSVs copied from ../master/ (keep master.go, ignore copied files)
+internal/master/by_work_type/
+
+# ghostty-web dist (downloaded from npm at build time)
+internal/web/ghostty/
+*.JPG
+*.PNG
+test_images/
+bin/
+*.exe~
