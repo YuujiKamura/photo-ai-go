@@ -21,3 +21,13 @@ internal/web/ghostty/
 test_images/
 bin/
 *.exe~
+
+# Debug / intermediate outputs (may contain real site names — keep out of public repo)
+result_*.json
+test_group_*.json
+ground_truth_reference.json
+test_report_*.pdf
+tmp_safe.txt
+
+# Local session state (OMC HUD)
+.omc/

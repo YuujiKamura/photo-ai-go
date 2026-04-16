@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/YuujiKamura/photo-ai-go/internal/master"
 	"github.com/YuujiKamura/photo-ai-go/internal/matching"
 	"github.com/YuujiKamura/photo-ai-go/internal/pipeline"
 	"github.com/YuujiKamura/photo-ai-go/pkg/engine"
@@ -18,26 +19,55 @@ import (
 // runGoEngine executes the Go-native pipeline and writes result.json.
 // The output schema mirrors engine.AnalysisResult so downstream consumers
 // (export pdf/excel, pair) can work with either engine's output unchanged.
-func runGoEngine(folder, destJSON, master string, flags analyzeFlagSet) error {
+func runGoEngine(folder, destJSON, masterPath string, flags analyzeFlagSet) error {
+	// Initialize extrapolator from snapshots AND ground-truth
+	// ex, _ := extrapolator.NewExtrapolator(
+	// 	`C:\Users\yuuji\analysis-snapshots`,
+	// 	`C:\Users\yuuji\photo-ai-ground-truth`,
+	// )
+
 	cfg := pipeline.Config{
-		Folder:     folder,
-		BatchSize:  flags.batchSize,
-		WorkType:   flags.workType,
-		PhotoType:  flags.photoType,
-		Variety:    flags.variety,
-		Station:    flags.station,
-		UseCache:   flags.useCache,
-		Recursive:  flags.recursive,
-		IncludeAll: flags.includeAll,
-		PayPerUse:  flags.payPerUse,
+		Folder:       folder,
+		BatchSize:    flags.batchSize,
+		WorkType:     flags.workType,
+		PhotoType:    flags.photoType,
+		Variety:      flags.variety,
+		Station:      flags.station,
+		UseCache:     flags.useCache,
+		Recursive:    flags.recursive,
+		IncludeAll:   flags.includeAll,
+		Limit:        flags.limit,
+		PayPerUse:    flags.payPerUse,
+		Extrapolator: nil, // ex,
 	}
 
-	if master != "" {
-		hm, err := matching.NewHierarchyMasterFromCSVFile(master)
-		if err != nil {
-			return fmt.Errorf("go engine: load master %s: %w", master, err)
+	// Resolve and load master data
+	resolvedMaster, err := master.ResolveMasterDir(masterPath)
+	if err == nil {
+		var hm *matching.HierarchyMaster
+		info, _ := os.Stat(resolvedMaster)
+		
+		if info.IsDir() {
+			// If user specified a work type, only load relevant CSVs from the bundle
+			if flags.workType != "" {
+				fmt.Fprintf(os.Stderr, "[go engine] 工種 %q に関連するマスタのみをロードします\n", flags.workType)
+				hm, err = matching.NewHierarchyMasterFromBundleFiltered(resolvedMaster, flags.workType)
+			} else {
+				fmt.Fprintf(os.Stderr, "[go engine] マスタディレクトリをロード中: %s\n", resolvedMaster)
+				hm, err = matching.NewHierarchyMasterFromBundle(resolvedMaster)
+			}
+		} else {
+			fmt.Fprintf(os.Stderr, "[go engine] マスタCSVをロード中: %s\n", resolvedMaster)
+			hm, err = matching.NewHierarchyMasterFromCSVFile(resolvedMaster)
 		}
-		cfg.HierarchyMaster = hm
+
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "[warning] マスタのロードに失敗しました: %v\n", err)
+		} else {
+			cfg.HierarchyMaster = hm
+		}
+	} else {
+		fmt.Fprintf(os.Stderr, "[warning] 工種マスタが見つかりません。マッチングをスキップします。\n")
 	}
 
 	results, err := pipeline.Run(context.Background(), cfg)
@@ -99,6 +129,7 @@ func pipelineResultsToEngineResults(src []pipeline.Result) []engine.AnalysisResu
 			Subphase:      r.Subphase,
 			Station:       r.Station,
 			Remarks:       r.Remarks,
+			RemarksCandidates: []string{},
 			Description:   r.Description,
 			HasBoard:      r.HasBoard,
 			DetectedText:  r.DetectedText,
@@ -107,7 +138,7 @@ func pipelineResultsToEngineResults(src []pipeline.Result) []engine.AnalysisResu
 			Reasoning:     r.Reasoning,
 			FocusTarget:   r.FocusTarget,
 			Group:         r.Group,
-			AnalysisLatencyMs: r.AnalysisLatencyMs,
+			LabelOverrides: map[string]string{},
 		}
 	}
 	return out

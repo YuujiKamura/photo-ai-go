@@ -686,29 +686,6 @@ func loadMasterCSVs(repoDir string) (map[string][]MasterRow, error) {
 	return result, nil
 }
 
-func loadMasterCSVsFromEmbed() (map[string][]MasterRow, error) {
-	entries, err := masterruntime.EmbeddedMaster.ReadDir("by_work_type")
-	if err != nil {
-		return nil, fmt.Errorf("no master files on disk or embedded: %w", err)
-	}
-	log.Printf("Loading %d master files from embedded binary", len(entries))
-	result := make(map[string][]MasterRow)
-	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".csv") {
-			continue
-		}
-		name := strings.TrimSuffix(e.Name(), ".csv")
-		f, err := masterruntime.EmbeddedMaster.Open("by_work_type/" + e.Name())
-		if err != nil {
-			continue
-		}
-		rows := parseMasterCSV(f)
-		f.Close()
-		result[name] = rows
-	}
-	return result, nil
-}
-
 func parseMasterCSV(r io.Reader) []MasterRow {
 	cr := csv.NewReader(r)
 	header, err := cr.Read()

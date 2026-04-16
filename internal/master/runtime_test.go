@@ -6,20 +6,50 @@ import (
 	"testing"
 )
 
-func TestResolveMasterSourceSeedsUserRoot(t *testing.T) {
-	tmp := t.TempDir()
-	t.Setenv("PHOTO_AI_MASTER_DIR", filepath.Join(tmp, "user-master"))
-	src, err := ResolveMasterSource(t.TempDir())
-	if err != nil {
-		t.Fatalf("ResolveMasterSource: %v", err)
+func TestResolveMasterSource(t *testing.T) {
+	tmpDir := t.TempDir()
+	userMasterDir := filepath.Join(tmpDir, "user-master")
+	os.MkdirAll(userMasterDir, 0755)
+
+	// Create a valid manifest and dummy CSV
+	manifest := Manifest{
+		SchemaVersion: 1,
+		MasterVersion: "1.0",
+		Files:         []string{"test.csv"},
 	}
-	if src.Source != SourceUser {
-		t.Fatalf("expected user source, got %s", src.Source)
-	}
-	if _, err := os.Stat(filepath.Join(src.RootDir, "manifest.json")); err != nil {
-		t.Fatalf("expected seeded manifest: %v", err)
-	}
-	if _, err := os.Stat(filepath.Join(src.RootDir, "by_work_type", "舗装工.csv")); err != nil {
-		t.Fatalf("expected seeded csv: %v", err)
-	}
+	WriteManifestToRoot(userMasterDir, manifest)
+	os.WriteFile(filepath.Join(userMasterDir, "test.csv"), []byte("header\ndata"), 0644)
+
+	t.Run("env_var", func(t *testing.T) {
+		t.Setenv("PHOTO_AI_MASTER_DIR", userMasterDir)
+		src, err := ResolveMasterSource(t.TempDir())
+		if err != nil {
+			t.Fatalf("ResolveMasterSource: %v", err)
+		}
+		if src.Source != SourceUser {
+			t.Errorf("expected user source, got %s", src.Source)
+		}
+		if src.RootDir != userMasterDir {
+			t.Errorf("got %q, want %q", src.RootDir, userMasterDir)
+		}
+	})
+
+	t.Run("workspace", func(t *testing.T) {
+		t.Setenv("PHOTO_AI_MASTER_DIR", "")
+		t.Setenv("LOCALAPPDATA", filepath.Join(t.TempDir(), "nonexistent"))
+		t.Setenv("APPDATA", filepath.Join(t.TempDir(), "nonexistent"))
+		workspaceDir := t.TempDir()
+		masterDir := filepath.Join(workspaceDir, "master")
+		os.MkdirAll(masterDir, 0755)
+		WriteManifestToRoot(masterDir, manifest)
+		os.WriteFile(filepath.Join(masterDir, "test.csv"), []byte("header\ndata"), 0644)
+
+		src, err := ResolveMasterSource(workspaceDir)
+		if err != nil {
+			t.Fatalf("ResolveMasterSource: %v", err)
+		}
+		if src.Source != SourceWorkspace {
+			t.Errorf("expected workspace source, got %s", src.Source)
+		}
+	})
 }

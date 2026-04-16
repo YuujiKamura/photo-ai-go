@@ -13,14 +13,6 @@ type Manifest struct {
 	Files         []string `json:"files"`
 }
 
-func ReadEmbeddedManifest() (Manifest, error) {
-	data, err := EmbeddedMaster.ReadFile("manifest.json")
-	if err != nil {
-		return Manifest{}, fmt.Errorf("read embedded manifest: %w", err)
-	}
-	return parseManifest(data)
-}
-
 func ReadManifestFromRoot(root string) (Manifest, error) {
 	data, err := os.ReadFile(filepath.Join(root, "manifest.json"))
 	if err != nil {

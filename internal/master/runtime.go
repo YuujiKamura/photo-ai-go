@@ -2,15 +2,13 @@ package master
 
 import (
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 )
 
 const (
-	SourceUser         = "user"
-	SourceWorkspace    = "workspace"
-	SourceEmbeddedSeed = "embedded-seed"
+	SourceUser      = "user"
+	SourceWorkspace = "workspace"
 )
 
 type Source struct {
@@ -22,16 +20,23 @@ type Source struct {
 	MasterVersion string
 }
 
+// ResolveMasterSource attempts to find a valid master directory.
 func ResolveMasterSource(repoDir string) (Source, error) {
-	userRoot, err := userMasterRoot()
-	if err == nil {
-		if err := ensureSeededUserMaster(userRoot); err == nil {
-			if src, ok := loadSourceFromRoot(userRoot, SourceUser, true); ok {
-				return src, nil
-			}
+	// 1. Try environment path if explicitly set
+	if env := os.Getenv("PHOTO_AI_MASTER_DIR"); env != "" {
+		if src, ok := loadSourceFromRoot(env, SourceUser, true); ok {
+			return src, nil
 		}
 	}
 
+	// 2. Try default user root
+	if userRoot, err := userMasterRoot(); err == nil {
+		if src, ok := loadSourceFromRoot(userRoot, SourceUser, true); ok {
+			return src, nil
+		}
+	}
+
+	// 3. Try relative to repository/executable
 	if src, ok := loadSourceFromRoot(filepath.Join(repoDir, "master"), SourceWorkspace, true); ok {
 		return src, nil
 	}
@@ -55,38 +60,6 @@ func userMasterRoot() (string, error) {
 	return base, nil
 }
 
-func ensureSeededUserMaster(root string) error {
-	manifestPath := filepath.Join(root, "manifest.json")
-	if _, err := os.Stat(manifestPath); err == nil {
-		return nil
-	}
-
-	manifest, err := ReadEmbeddedManifest()
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(filepath.Join(root, "by_work_type"), 0o755); err != nil {
-		return fmt.Errorf("mkdir user master root: %w", err)
-	}
-	for _, name := range manifest.Files {
-		data, err := EmbeddedMaster.ReadFile(name)
-		if err != nil {
-			return fmt.Errorf("read embedded master file %s: %w", name, err)
-		}
-		dest := filepath.Join(root, filepath.FromSlash(name))
-		if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
-			return fmt.Errorf("mkdir parent for %s: %w", dest, err)
-		}
-		if err := os.WriteFile(dest, data, 0o644); err != nil {
-			return fmt.Errorf("write seeded master file %s: %w", dest, err)
-		}
-	}
-	if err := WriteManifestToRoot(root, manifest); err != nil {
-		return err
-	}
-	return nil
-}
-
 func loadSourceFromRoot(root string, sourceName string, writable bool) (Source, bool) {
 	manifest, err := ReadManifestFromRoot(root)
 	if err != nil {
@@ -105,19 +78,4 @@ func loadSourceFromRoot(root string, sourceName string, writable bool) (Source, 
 		SchemaVersion: manifest.SchemaVersion,
 		MasterVersion: manifest.MasterVersion,
 	}, true
-}
-
-func ListEmbeddedFiles() ([]string, error) {
-	entries, err := fs.ReadDir(EmbeddedMaster, "by_work_type")
-	if err != nil {
-		return nil, err
-	}
-	files := make([]string, 0, len(entries))
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		files = append(files, filepath.ToSlash(filepath.Join("by_work_type", entry.Name())))
-	}
-	return files, nil
 }

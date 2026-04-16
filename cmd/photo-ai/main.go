@@ -25,6 +25,7 @@ type analyzeFlagSet struct {
 	useCache    bool
 	recursive   bool
 	includeAll  bool
+	limit       int
 	folderRules string
 	payPerUse   bool
 }
@@ -80,6 +81,7 @@ func init() {
 	analyzeCmd.Flags().String("folder-rules", "", "Folder-rule override JSON file")
 	analyzeCmd.Flags().Bool("pay-per-use", false, "Use pay-per-use billing instead of subscription/resident mode")
 	analyzeCmd.Flags().String("engine", "rust", "Analysis engine to use: rust (Rust DLL path) or go (Go-native pipeline)")
+	analyzeCmd.Flags().Int("limit", 0, "Limit number of photos to analyze (0 = all)")
 
 	// export pdf flags
 	exportPDFCmd.Flags().StringP("output", "o", "", "Output PDF file or directory")
@@ -124,6 +126,7 @@ var analyzeCmd = &cobra.Command{
 		useCache, _ := cmd.Flags().GetBool("use-cache")
 		recursive, _ := cmd.Flags().GetBool("recursive")
 		includeAll, _ := cmd.Flags().GetBool("include-all")
+		limit, _ := cmd.Flags().GetInt("limit")
 		folderRules, _ := cmd.Flags().GetString("folder-rules")
 		payPerUse, _ := cmd.Flags().GetBool("pay-per-use")
 
@@ -136,6 +139,7 @@ var analyzeCmd = &cobra.Command{
 			useCache:    useCache,
 			recursive:   recursive,
 			includeAll:  includeAll,
+			limit:       limit,
 			folderRules: folderRules,
 			payPerUse:   payPerUse,
 		}

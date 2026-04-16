@@ -138,6 +138,14 @@ func buildBigrams(runes []rune) map[string]int {
 	return bg
 }
 
+// CalculateSimilarity returns the bigram similarity score (Dice coefficient) between
+// two strings, ranging from 0.0 to 1.0.
+func CalculateSimilarity(a, b string) float64 {
+	bgA := buildBigrams([]rune(normalizeForMatch(a)))
+	bgB := buildBigrams([]rune(normalizeForMatch(b)))
+	return bigramSimilarity(bgA, bgB)
+}
+
 // bigramSimilarity computes the Dice coefficient between two bigram multisets.
 // This matches the Rust implementation which intersects two HashSets and divides
 // by the geometric mean of their sizes.
