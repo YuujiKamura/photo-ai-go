@@ -31,3 +31,5 @@ tmp_safe.txt
 
 # Local session state (OMC HUD)
 .omc/
+
+.omc/state/
